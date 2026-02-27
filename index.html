@@ -682,4 +682,1204 @@
         }
 
         .blocked-notice-icon {
-   
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .blocked-notice h4 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 24px;
+            margin-bottom: 12px;
+            color: var(--color-text-light);
+        }
+
+        .blocked-notice p {
+            font-size: 14px;
+            opacity: 0.8;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Overlay para fondo en móvil -->
+    <div class="chat-overlay" id="chatOverlay"></div>
+
+    <!-- Botón flotante discreto -->
+    <button class="chat-trigger" id="chatTrigger" aria-label="Iniciar conversación">
+        <svg viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+        </svg>
+    </button>
+
+    <!-- Contenedor principal del chat -->
+    <div class="chat-container" id="chatContainer">
+        
+        <!-- Header elegante -->
+        <header class="chat-header">
+            <div class="chat-header-content">
+                <div class="chat-brand">
+                    <div class="chat-avatar">S</div>
+                    <div class="chat-title-group">
+                        <h3>Santai Masajes</h3>
+                        <div class="chat-status">Concierge Privado</div>
+                    </div>
+                </div>
+                <button class="chat-close" id="chatClose" aria-label="Cerrar conversación">×</button>
+            </div>
+        </header>
+
+        <!-- Área de mensajes -->
+        <div class="chat-messages" id="chatMessages">
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+
+        <!-- Botones de acción dinámicos -->
+        <div class="chat-actions" id="chatActions"></div>
+
+        <!-- Input de texto -->
+        <div class="chat-input-area">
+            <input 
+                type="text" 
+                class="chat-input" 
+                id="chatInput" 
+                placeholder="Escribe su consulta..." 
+                autocomplete="off"
+            >
+            <button class="chat-send" id="chatSend" aria-label="Enviar mensaje">
+                <svg viewBox="0 0 24 24">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * SANTAI CHATBOT - Sistema de Reservas Premium
+         * Centro de Masajes Sensoriales - Barcelona
+         * 
+         * Arquitectura: Máquina de estados finita
+         * Sin dependencias externas. Vanilla JS puro.
+         */
+
+        // ==========================================
+        // CONFIGURACIÓN DEL SISTEMA
+        // ==========================================
+        
+        const CONFIG = {
+            // Palabras clave para reinicio global
+            RESET_KEYWORDS: ['menu', 'inicio', 'volver', 'principal', 'opciones', 'empezar'],
+            
+            // Palabras prohibidas (tolerancia cero tras 2 advertencias)
+            FORBIDDEN_WORDS: [
+                'sexo', 'penetración', 'penetracion', 'coito', 
+                'oral', 'anal', 'completo', 'todo incluido', 
+                'final feliz', 'masaje con final', 'relación', 
+                'cama', 'desnudo total', 'contacto íntimo'
+            ],
+            
+            // Límites de seguridad
+            MAX_DATE_ATTEMPTS: 2,
+            MAX_FORBIDDEN_ATTEMPTS: 2,
+            INACTIVITY_TIMEOUT: 5 * 60 * 1000, // 5 minutos
+            
+            // Horario de operación
+            BUSINESS_HOURS: {
+                open: 11,
+                close: 21,
+                days: [1, 2, 3, 4, 5, 6] // Lunes(1) a Sábado(6), Domingo(0) cerrado
+            }
+        };
+
+        // ==========================================
+        // BASE DE CONOCIMIENTO: FAQ PREMIUM
+        // Respuestas elegantes, legales y discretas
+        // ==========================================
+        
+        const FAQ_DATABASE = {
+            'seguridad_discrecion': {
+                keywords: ['seguro', 'segura', 'discreto', 'discreción', 'privacidad', 'anónimo'],
+                question: '¿Es un servicio seguro y discreto?',
+                answer: `Absolutamente. La confidencialidad es nuestro pilar fundamental. Disponemos de entrada privada independiente, sistema de citas escalonadas para garantizar su privacidad, y un equipo comprometido con el más estricto código deontológico. Su visita no dejará rastro alguno.`
+            },
+            
+            'que_incluye': {
+                keywords: ['incluye', 'qué hay', 'qué tiene', 'servicio', 'sesión incluye'],
+                question: '¿Qué incluye exactamente la sesión?',
+                answer: `Su experiencia incluye: bienvenida con infusiones selectas, uso de nuestras instalaciones con ducha privada, toallas de algodón egipcio, productos cosméticos de alta gama, y la sesión de masaje sensorial realizada íntegramente con técnicas manuales profesionales por terapeutas certificadas. Ambiente climatizado, música ambiental y aromaterapia personalizada.`
+            },
+            
+            'limites_servicio': {
+                keywords: ['práctica íntima', 'adicional', 'extra', 'completo', 'todo incluido', 'sexo', 'penetración', 'oral'],
+                question: '¿Hay algún tipo de práctica íntima adicional?',
+                answer: `Nuestro establecimiento ofrece exclusivamente masajes sensoriales y terapéuticos realizados con las manos. No proporcionamos ni toleramos solicitudes de servicios sexuales o prácticas íntimas de ningún tipo. Somos un centro de bienestar profesional regulado. Cualquier insinuación en este sentido resultará en la inmediata finalización de la conversación.`
+            },
+            
+            'higiene': {
+                keywords: ['higiene', 'limpio', 'limpieza', 'protocolo', 'covid', 'sanitario'],
+                question: '¿Se cumple protocolo de higiene?',
+                answer: `Mantenimos estándares hospitalarios de higiene. Todas nuestras cabinas se sanitizan integralmente tras cada sesión con productos certificados. El lino es de un solo uso y se procesa en lavandería industrial. Nuestras terapeutas siguen rigurosos protocolos de lavado de manos y utilizan equipamiento de protección cuando es pertinente. Su seguridad es prioridad absoluta.`
+            },
+            
+            'elegir_masajista': {
+                keywords: ['elegir', 'escoger', 'seleccionar', 'masajista', 'terapeuta', 'quién me atiende'],
+                question: '¿Puedo elegir masajista?',
+                answer: `Puede expresar sus preferencias respecto a la terapeuta y haremos todo lo posible por acomodarlas, sujeto a disponibilidad. Todas nuestras profesionales están igualmente certificadas y mantienen nuestros exigentes estándares de calidad. La elección definitiva depende de la agenda del día solicitado.`
+            },
+            
+            'pago_adelantado': {
+                keywords: ['pagar', 'adelantado', 'anticipado', 'señal', 'transferencia', 'bizum'],
+                question: '¿Es obligatorio pagar por adelantado?',
+                answer: `No requerimos pago anticipado. El abono se realiza íntegramente en nuestras instalaciones al concluir su sesión. Aceptamos efectivo, tarjeta de crédito/débito y Bizum. Para reservas de suite VIP o sesiones de pareja prolongadas, podemos solicitar una señal simbólica que se descuenta del total.`
+            },
+            
+            'cambio_cancelacion': {
+                keywords: ['cambiar', 'cancelar', 'modificar', 'anular', 'no puedo ir', 'otro día'],
+                question: '¿Se puede cambiar o cancelar la cita?',
+                answer: `Entendemos que surgen imprevistos. Puede modificar o cancelar su cita sin coste alguno con un mínimo de 6 horas de antelación. Para cambios con menos tiempo, aplicamos una compensación del 30% del servicio. Las no-presentaciones sin aviso previo pueden limitar futuras reservas.`
+            },
+            
+            'privacidad_sesion': {
+                keywords: ['privada', 'solo', 'exclusivo', 'habitación', 'cabina'],
+                question: '¿La sesión es completamente privada?',
+                answer: `Cada cliente disfruta de una cabină individual insonorizada con baño privado. No compartirá espacio con otros clientes en ningún momento de su visita. La recepción está separada físicamente de las áreas de tratamiento. Su intimidad está garantizada en todo instante.`
+            },
+            
+            'sesion_pareja': {
+                keywords: ['pareja', 'dos personas', 'juntos', 'mi pareja', 'nosotros'],
+                question: '¿Se puede asistir en pareja?',
+                answer: `Disponemos de una exclusiva Suite Dual para sesiones simultáneas. Dos terapeutas atenderán a ambos en el mismo espacio, permitiéndoles compartir la experiencia de relajación. Es necesaria reserva previa con mínimo 24 horas de antelación para garantizar la disponibilidad de la suite.`
+            },
+            
+            'dudas_previas': {
+                keywords: ['dudas', 'preguntas', 'información', 'antes', 'primera vez', 'nervioso'],
+                question: '¿Qué ocurre si tengo dudas antes de reservar?',
+                answer: `Estamos aquí para guiarle. Puede contactarnos vía este chat, email o formulario web. Respondemos todas las consultas con la máxima discreción. Para primerizos, ofrecemos una breve consulta telefónica gratuita donde resolveremos sus inquietudes específicas antes de confirmar su cita.`
+            }
+        };
+
+        // ==========================================
+        // ESTADO GLOBAL DE LA CONVERSACIÓN
+        // ==========================================
+        
+        const conversationState = {
+            current: 'inicio',           // Estado actual de la máquina de estados
+            sessionType: null,           // 'individual' | 'pareja'
+            duration: null,              // '60' | '90' | '120'
+            date: null,                  // Fecha seleccionada (string DD/MM/YYYY)
+            time: null,                  // Hora seleccionada
+            name: null,                  // Nombre del cliente
+            email: null,                 // Email para contacto
+            phone: null,                 // Teléfono (nunca mostrado en UI)
+            query: null,                 // Motivo de consulta por email
+            
+            // Contadores de seguridad
+            dateAttempts: 0,
+            forbiddenAttempts: 0,
+            
+            // Control de contexto
+            pendingSwitch: null,         // Cambio de estado pendiente (coherencia)
+            lastActivity: Date.now(),    // Timestamp última interacción
+            messageHistory: []           // Historial para contexto (opcional)
+        };
+
+        // ==========================================
+        // REFERENCIAS DOM
+        // ==========================================
+        
+        const DOM = {
+            trigger: document.getElementById('chatTrigger'),
+            container: document.getElementById('chatContainer'),
+            overlay: document.getElementById('chatOverlay'),
+            close: document.getElementById('chatClose'),
+            messages: document.getElementById('chatMessages'),
+            actions: document.getElementById('chatActions'),
+            input: document.getElementById('chatInput'),
+            send: document.getElementById('chatSend'),
+            typing: document.getElementById('typingIndicator')
+        };
+
+        // ==========================================
+        // UTILIDADES Y HELPERS
+        // ==========================================
+
+        /**
+         * Normaliza texto para comparaciones seguras
+         * Elimina acentos, pasa a minúsculas, elimina espacios extra
+         */
+        function normalizeText(text) {
+            return text
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        /**
+         * Detecta palabras prohibidas en el texto
+         * Retorna booleano
+         */
+        function detectForbiddenWords(text) {
+            const normalized = normalizeText(text);
+            return CONFIG.FORBIDDEN_WORDS.some(word => normalized.includes(word));
+        }
+
+        /**
+         * Detecta palabras clave de reinicio
+         */
+        function detectResetKeyword(text) {
+            const normalized = normalizeText(text);
+            return CONFIG.RESET_KEYWORDS.some(keyword => normalized.includes(keyword));
+        }
+
+        /**
+         * Intenta detectar pregunta FAQ basada en keywords
+         * Retorna el ID de la FAQ o null
+         */
+        function detectFAQIntent(text) {
+            const normalized = normalizeText(text);
+            
+            for (const [key, data] of Object.entries(FAQ_DATABASE)) {
+                if (data.keywords.some(kw => normalized.includes(kw))) {
+                    return key;
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Valida fecha con reglas de negocio reales
+         * Retorna objeto: { valid: boolean, error?: string, data?: object }
+         */
+        function validateDateTime(dateStr, timeStr = null) {
+            // Validar formato fecha DD/MM/YYYY
+            const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+            const dateMatch = dateStr.match(dateRegex);
+            
+            if (!dateMatch) {
+                return { 
+                    valid: false, 
+                    error: 'El formato debe ser DD/MM/AAAA (ejemplo: 15/03/2024)' 
+                };
+            }
+
+            const day = parseInt(dateMatch[1], 10);
+            const month = parseInt(dateMatch[2], 10);
+            const year = parseInt(dateMatch[3], 10);
+            
+            // Verificar mes válido
+            if (month < 1 || month > 12) {
+                return { valid: false, error: 'El mes debe estar entre 01 y 12' };
+            }
+            
+            // Verificar día válido para el mes específico
+            const daysInMonth = new Date(year, month, 0).getDate();
+            if (day < 1 || day > daysInMonth) {
+                return { 
+                    valid: false, 
+                    error: `El mes ${month} solo tiene ${daysInMonth} días. Por favor, verifique la fecha.` 
+                };
+            }
+
+            // Crear objeto fecha
+            const inputDate = new Date(year, month - 1, day);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Verificar fecha pasada
+            if (inputDate < today) {
+                return { valid: false, error: 'No es posible reservar para fechas pasadas' };
+            }
+
+            // Verificar domingo (0 = domingo)
+            const dayOfWeek = inputDate.getDay();
+            if (dayOfWeek === 0) {
+                return { valid: false, error: 'Nuestro centro permanece cerrado los domingos. Le esperamos de lunes a sábado.' };
+            }
+
+            // Si se proporciona hora, validarla
+            if (timeStr) {
+                const timeRegex = /^(\d{2}):(\d{2})$/;
+                const timeMatch = timeStr.match(timeRegex);
+                
+                if (!timeMatch) {
+                    return { valid: false, error: 'Formato de hora inválido. Use HH:MM (ejemplo: 16:00)' };
+                }
+
+                const hour = parseInt(timeMatch[1], 10);
+                const minute = parseInt(timeMatch[2], 10);
+
+                // Validar rangos
+                if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+                    return { valid: false, error: 'Hora inválida' };
+                }
+
+                // Validar horario comercial 11:00 - 21:00
+                if (hour < 11 || hour >= 21) {
+                    return { 
+                        valid: false, 
+                        error: 'Nuestro horario es de 11:00 a 21:00. Por favor, seleccione una hora dentro de este rango.' 
+                    };
+                }
+
+                // Verificar si la fecha/hora ya pasó (para hoy)
+                if (inputDate.getTime() === today.getTime()) {
+                    const currentHour = new Date().getHours();
+                    if (hour <= currentHour) {
+                        return { valid: false, error: 'La hora seleccionada ya ha pasado para hoy' };
+                    }
+                }
+
+                return { 
+                    valid: true, 
+                    data: { 
+                        date: `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`,
+                        time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
+                        dayOfWeek: dayOfWeek
+                    }
+                };
+            }
+
+            return { 
+                valid: true, 
+                data: { 
+                    date: `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`,
+                    dayOfWeek: dayOfWeek
+                }
+            };
+        }
+
+        /**
+         * Formatea fecha para display elegante
+         */
+        function formatDateElegant(dateStr) {
+            const [day, month, year] = dateStr.split('/');
+            const date = new Date(year, month - 1, day);
+            const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                          'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+            
+            return `${days[date.getDay()]}, ${day} de ${months[date.getMonth()]} de ${year}`;
+        }
+
+        /**
+         * Delay asíncrono para simular escritura humana
+         */
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // ==========================================
+        // GESTIÓN DE UI
+        // ==========================================
+
+        /**
+         * Añade mensaje al chat con animación
+         */
+        function addMessage(text, type = 'bot') {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${type}`;
+            
+            // Procesar negritas si las hay (formato: **texto**)
+            const formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            msgDiv.innerHTML = formattedText;
+            
+            DOM.messages.insertBefore(msgDiv, DOM.typing);
+            scrollToBottom();
+            
+            // Guardar en historial
+            conversationState.messageHistory.push({ type, text, timestamp: Date.now() });
+            
+            return msgDiv;
+        }
+
+        /**
+         * Muestra indicador de escritura
+         */
+        function showTyping() {
+            DOM.typing.classList.add('active');
+            scrollToBottom();
+        }
+
+        /**
+         * Oculta indicador de escritura
+         */
+        function hideTyping() {
+            DOM.typing.classList.remove('active');
+        }
+
+        /**
+         * Respuesta del bot con delay natural
+         */
+        async function botResponse(text, delayTime = 800) {
+            showTyping();
+            await delay(delayTime);
+            hideTyping();
+            return addMessage(text, 'bot');
+        }
+
+        /**
+         * Scroll suave al final
+         */
+        function scrollToBottom() {
+            DOM.messages.scrollTop = DOM.messages.scrollHeight;
+        }
+
+        /**
+         * Limpia botones de acción
+         */
+        function clearActions() {
+            DOM.actions.innerHTML = '';
+        }
+
+        /**
+         * Crea botón de acción elegante
+         */
+        function createActionButton(text, onClick, options = {}) {
+            const btn = document.createElement('button');
+            btn.className = `action-btn ${options.primary ? 'primary' : ''} ${options.secondary ? 'secondary' : ''}`;
+            btn.innerHTML = `<span>${text}</span>`;
+            btn.onclick = onClick;
+            if (options.disabled) btn.disabled = true;
+            return btn;
+        }
+
+        /**
+         * Añade botón a la zona de acciones
+         */
+        function addAction(text, onClick, options = {}) {
+            DOM.actions.appendChild(createActionButton(text, onClick, options));
+        }
+
+        /**
+         * Crea grid de botones (2 columnas)
+         */
+        function addActionGrid(buttons) {
+            const grid = document.createElement('div');
+            grid.className = 'actions-grid';
+            
+            buttons.forEach(({ text, onClick, primary }) => {
+                grid.appendChild(createActionButton(text, onClick, { primary }));
+            });
+            
+            DOM.actions.appendChild(grid);
+        }
+
+        /**
+         * Controla estado del input
+         */
+        function setInputState(enabled, placeholder = '') {
+            DOM.input.disabled = !enabled;
+            DOM.send.disabled = !enabled;
+            if (placeholder) DOM.input.placeholder = placeholder;
+            if (enabled) DOM.input.focus();
+        }
+
+        // ==========================================
+        // MÁQUINA DE ESTADOS PRINCIPAL
+        // Cada estado es una función asíncrona
+        // ==========================================
+
+        const StateMachine = {
+            
+            /**
+             * ESTADO INICIAL: Bienvenida premium
+             */
+            inicio: async () => {
+                conversationState.current = 'inicio';
+                clearActions();
+                setInputState(false);
+                
+                await botResponse('Bienvenido a Santai Masajes.', 600);
+                await botResponse('Somos un santuario de relajación sensorial en el corazón de Barcelona. Nuestro compromiso es ofrecerle una experiencia de bienestar absolutamente discreta y profesional.', 1200);
+                
+                await delay(400);
+                transitionTo('menu');
+            },
+
+            /**
+             * ESTADO MENÚ: Opciones principales
+             */
+            menu: async () => {
+                conversationState.current = 'menu';
+                clearActions();
+                setInputState(false);
+                
+                await botResponse('¿Cómo puedo asistirle hoy?');
+                
+                addAction('Reservar sesión individual', () => transitionTo('individual'), { primary: true });
+                addAction('Reservar sesión en pareja', () => transitionTo('pareja'), { primary: true });
+                addAction('Preguntas frecuentes', () => transitionTo('faq'));
+                addAction('Prefiero que me contacten por email', () => transitionTo('contacto_email'), { secondary: true });
+            },
+
+            /**
+             * ESTADO INDIVIDUAL: Flujo reserva personal
+             */
+            individual: async () => {
+                conversationState.current = 'individual';
+                conversationState.sessionType = 'individual';
+                clearActions();
+                
+                await botResponse('Ha seleccionado: **Sesión Individual**');
+                await botResponse('Nuestras terapeutas especializadas le ofrecerán una experiencia de relajación profunda mediante técnicas manuales exclusivas. Cada sesión se adapta a sus necesidades específicas de tensión muscular y estrés.');
+                
+                await delay(300);
+                
+                await botResponse('Seleccione la duración de su sesión:');
+                
+                addActionGrid([
+                    { text: '60 minutos — 120€', onClick: () => selectDuration('60'), primary: true },
+                    { text: '90 minutos — 170€', onClick: () => selectDuration('90'), primary: true }
+                ]);
+                addActionGrid([
+                    { text: '120 minutos — 220€', onClick: () => selectDuration('120'), primary: true },
+                    { text: '← Volver al menú', onClick: () => transitionTo('menu'), primary: false }
+                ]);
+            },
+
+            /**
+             * ESTADO PAREJA: Flujo reserva dual
+             */
+            pareja: async () => {
+                conversationState.current = 'pareja';
+                conversationState.sessionType = 'pareja';
+                clearActions();
+                
+                await botResponse('Ha seleccionado: **Sesión en Pareja**');
+                await botResponse('Nuestra Suite Dual está diseñada para que comparta un momento de desconexión absoluta. Dos terapeutas sincronizadas atenderán a ambos simultáneamente en un espacio íntimo y exclusivo.');
+                
+                await delay(300);
+                
+                await botResponse('Seleccione la duración para ambos:');
+                
+                addActionGrid([
+                    { text: '60 min — 220€', onClick: () => selectDuration('60'), primary: true },
+                    { text: '90 min — 320€', onClick: () => selectDuration('90'), primary: true }
+                ]);
+                addAction('120 minutos — 420€', () => selectDuration('120'), { primary: true });
+                addAction('← Volver al menú', () => transitionTo('menu'), { secondary: true });
+            },
+
+            /**
+             * ESTADO FAQ: Preguntas frecuentes interactivas
+             */
+            faq: async () => {
+                conversationState.current = 'faq';
+                clearActions();
+                setInputState(true, 'Escriba su pregunta o seleccione un tema...');
+                
+                await botResponse('**Preguntas Frecuentes**');
+                await botResponse('Puede escribir su consulta con sus propias palabras o seleccionar un tema:');
+                
+                // Mostrar preguntas como botones secundarios
+                const faqButtons = Object.entries(FAQ_DATABASE).slice(0, 6).map(([key, data]) => ({
+                    text: data.question,
+                    onClick: () => answerFAQ(key),
+                    primary: false
+                }));
+                
+                faqButtons.forEach(btn => addAction(btn.text, btn.onClick, { secondary: true }));
+                addAction('← Volver al menú principal', () => transitionTo('menu'), { secondary: true });
+            },
+
+            /**
+             * ESTADO RESERVA_DURACION: Transición tras seleccionar duración
+             * (Manejado por selectDuration, no se llama directamente)
+             */
+            reserva_duracion: async () => {
+                // Este estado es transicional, manejado por la lógica de selección
+                transitionTo('reserva_fecha');
+            },
+
+            /**
+             * ESTADO RESERVA_FECHA: Captura fecha y hora con validación real
+             */
+            reserva_fecha: async () => {
+                conversationState.current = 'reserva_fecha';
+                clearActions();
+                setInputState(true, 'DD/MM/AAAA');
+                
+                const sessionText = conversationState.sessionType === 'individual' 
+                    ? 'Sesión Individual' 
+                    : 'Sesión en Pareja';
+                
+                await botResponse(`**Resumen provisional:**\n${sessionText}\nDuración: ${conversationState.duration} minutos`);
+                await botResponse('Por favor, indique la fecha deseada (formato: DD/MM/AAAA):');
+                
+                // Información de horario
+                await delay(200);
+                addMessage('💡 Nuestro horario: Lunes a Sábado, 11:00 – 21:00', 'bot');
+            },
+
+            /**
+             * ESTADO RESERVA_DATOS: Captura información personal
+             */
+            reserva_datos: async () => {
+                conversationState.current = 'reserva_datos';
+                clearActions();
+                setInputState(true, 'Su nombre completo');
+                
+                await botResponse(`Fecha confirmada: **${formatDateElegant(conversationState.date)}** a las ${conversationState.time}h`);
+                await botResponse('Para formalizar su reserva, necesito algunos datos. ¿Cómo debo dirigirme a usted?');
+            },
+
+            /**
+             * ESTADO CONTACTO_EMAIL: Alternativa sin reserva inmediata
+             */
+            contacto_email: async () => {
+                conversationState.current = 'contacto_email';
+                conversationState.step = 'nombre'; // Sub-estado para flujo email
+                clearActions();
+                setInputState(true, 'Su nombre');
+                
+                await botResponse('Entendido. Nuestro equipo se pondrá en contacto con usted para resolver sus dudas o asistirle en su reserva de forma personalizada.');
+                await botResponse('Por favor, indíquenos su nombre:');
+            },
+
+            /**
+             * ESTADO CONFIRMADO: Finalización exitosa
+             */
+            confirmado: async () => {
+                conversationState.current = 'confirmado';
+                clearActions();
+                setInputState(false);
+                
+                if (conversationState.email) {
+                    // Flujo de contacto por email
+                    await botResponse('**Consulta registrada**');
+                    await botResponse(`Gracias, ${conversationState.name}. Hemos recibido su solicitud y nuestro equipo de concierge le contactará en la mayor brevedad posible al email proporcionado.`);
+                    await botResponse('Respuesta habitual en menos de 2 horas en horario comercial.');
+                } else {
+                    // Flujo de reserva completa
+                    await botResponse('**Reserva confirmada provisionalmente**');
+                    await botResponse(`Le esperamos el **${formatDateElegant(conversationState.date)}** a las **${conversationState.time}**.\n\n**Detalles:**\n• ${conversationState.sessionType === 'individual' ? 'Sesión Individual' : 'Sesión en Pareja'}\n• ${conversationState.duration} minutos\n• A nombre de: ${conversationState.name}`);
+                    await botResponse('Recibirá un SMS de confirmación en el número proporcionado. El pago se realizará en el centro tras su sesión.');
+                }
+                
+                await delay(500);
+                addAction('Realizar otra consulta', () => resetConversation(), { primary: true });
+                addAction('Finalizar conversación', () => toggleChat(), { secondary: true });
+                
+                // Preparar datos para backend
+                prepareLeadData();
+            },
+
+            /**
+             * ESTADO BLOQUEADO: Seguridad activada
+             */
+            bloqueado: async () => {
+                conversationState.current = 'bloqueado';
+                clearActions();
+                setInputState(false);
+                
+                // Limpiar mensajes previos para mostrar pantalla de bloqueo
+                DOM.messages.innerHTML = '';
+                
+                const blockedDiv = document.createElement('div');
+                blockedDiv.className = 'message blocked blocked-notice';
+                blockedDiv.innerHTML = `
+                    <div class="blocked-notice-icon">🛡️</div>
+                    <h4>Conversación finalizada</h4>
+                    <p>Por razones de seguridad y cumplimiento normativo, no podemos continuar esta conversación.<br><br>
+                    Si tiene una consulta legítima sobre nuestros servicios de bienestar, le invitamos a contactarnos directamente en recepción.</p>
+                `;
+                DOM.messages.appendChild(blockedDiv);
+            }
+        };
+
+        // ==========================================
+        // LÓGICA DE TRANSICIONES Y FLUJO
+        // ==========================================
+
+        /**
+         * Transición segura entre estados
+         */
+        async function transitionTo(newState) {
+            updateActivity();
+            
+            // Verificar si estamos bloqueados
+            if (conversationState.current === 'bloqueado') return;
+            
+            // Verificar coherencia: si hay cambio de tipo de sesión en medio de reserva
+            if (conversationState.sessionType && 
+                (newState === 'individual' || newState === 'pareja') &&
+                conversationState.sessionType !== newState &&
+                !['menu', 'inicio'].includes(conversationState.current)) {
+                
+                if (!conversationState.pendingSwitch) {
+                    conversationState.pendingSwitch = newState;
+                    await botResponse(`Está en proceso de reservar una sesión ${conversationState.sessionType}. ¿Desea cancelarla y comenzar una nueva reserva para sesión ${newState}?`);
+                    
+                    clearActions();
+                    addAction('Sí, nueva reserva', () => {
+                        conversationState.sessionType = null;
+                        conversationState.duration = null;
+                        conversationState.date = null;
+                        conversationState.time = null;
+                        conversationState.pendingSwitch = null;
+                        transitionTo(newState);
+                    }, { primary: true });
+                    
+                    addAction('No, continuar actual', () => {
+                        conversationState.pendingSwitch = null;
+                        transitionTo(conversationState.current);
+                    }, { secondary: true });
+                    
+                    return;
+                }
+            }
+            
+            // Resetear intentos al llegar a menú o inicio
+            if (['menu', 'inicio'].includes(newState)) {
+                conversationState.dateAttempts = 0;
+            }
+            
+            // Ejecutar estado
+            if (StateMachine[newState]) {
+                await StateMachine[newState]();
+            } else {
+                console.error(`Estado no definido: ${newState}`);
+            }
+        }
+
+        /**
+         * Selección de duración
+         */
+        function selectDuration(minutes) {
+            conversationState.duration = minutes;
+            transitionTo('reserva_fecha');
+        }
+
+        /**
+         * Respuesta a FAQ específica
+         */
+        async function answerFAQ(faqKey) {
+            const faq = FAQ_DATABASE[faqKey];
+            if (!faq) return;
+            
+            clearActions();
+            await botResponse(`**${faq.question}**`);
+            await botResponse(faq.answer, 600);
+            
+            await delay(400);
+            
+            addAction('Tengo otra pregunta', () => transitionTo('faq'), { secondary: true });
+            addAction('Quiero reservar', () => transitionTo('menu'), { primary: true });
+        }
+
+        /**
+         * Prepara objeto JSON para envío a backend
+         */
+        function prepareLeadData() {
+            const leadData = {
+                timestamp: new Date().toISOString(),
+                type: conversationState.email ? 'contacto' : 'reserva',
+                data: {
+                    sessionType: conversationState.sessionType,
+                    duration: conversationState.duration,
+                    date: conversationState.date,
+                    time: conversationState.time,
+                    name: conversationState.name,
+                    phone: conversationState.phone,
+                    email: conversationState.email,
+                    query: conversationState.query
+                },
+                metadata: {
+                    userAgent: navigator.userAgent,
+                    language: navigator.language,
+                    referrer: document.referrer
+                }
+            };
+            
+            console.log('Lead preparado para backend:', leadData);
+            
+            // Aquí se haría el fetch real al backend
+            // sendToBackend(leadData);
+            
+            return leadData;
+        }
+
+        // ==========================================
+        // PROCESAMIENTO DE ENTRADAS DEL USUARIO
+        // ==========================================
+
+        /**
+         * Procesa texto ingresado según estado actual
+         */
+        async function processUserInput(text) {
+            const trimmed = text.trim();
+            if (!trimmed) return;
+            
+            updateActivity();
+            
+            // 1. Verificar palabras prohibidas (prioridad máxima)
+            if (detectForbiddenWords(trimmed)) {
+                conversationState.forbiddenAttempts++;
+                
+                if (conversationState.forbiddenAttempts >= CONFIG.MAX_FORBIDDEN_ATTEMPTS) {
+                    await botResponse('Lamento informarle que no podemos atender solicitudes de ese tipo. Nuestro centro mantiene estrictos protocolos de profesionalidad.', 600);
+                    await delay(800);
+                    transitionTo('bloqueado');
+                    return;
+                }
+                
+                await botResponse('Debo aclararle que Santai Masajes es un centro de bienestar profesional. Ofrecemos exclusivamente masajes terapéuticos y sensoriales realizados con técnicas manuales certificadas. Cualquier otra solicitud queda fuera de nuestros servicios.', 800);
+                return;
+            }
+            
+            // 2. Verificar palabras de reinicio
+            if (detectResetKeyword(trimmed)) {
+                await botResponse('Volviendo al menú principal...', 400);
+                resetConversation();
+                return;
+            }
+            
+            // 3. Máquina de estados para inputs libres
+            switch (conversationState.current) {
+                case 'faq':
+                    await handleFAQInput(trimmed);
+                    break;
+                    
+                case 'reserva_fecha':
+                    await handleDateInput(trimmed);
+                    break;
+                    
+                case 'reserva_datos':
+                    await handlePersonalDataInput(trimmed);
+                    break;
+                    
+                case 'contacto_email':
+                    await handleEmailContactInput(trimmed);
+                    break;
+                    
+                case 'menu':
+                case 'inicio':
+                    await botResponse('Por favor, seleccione una de las opciones disponibles o escriba "menu" para verlas de nuevo.');
+                    break;
+                    
+                default:
+                    await botResponse('No he comprendido su mensaje. Escriba "menu" para ver las opciones disponibles.');
+            }
+        }
+
+        /**
+         * Maneja input en estado FAQ (búsqueda inteligente)
+         */
+        async function handleFAQInput(text) {
+            const faqKey = detectFAQIntent(text);
+            
+            if (faqKey) {
+                await answerFAQ(faqKey);
+            } else {
+                await botResponse('No tengo una respuesta específica para esa consulta. Permítame sugerirle las preguntas más frecuentes:');
+                transitionTo('faq');
+            }
+        }
+
+        /**
+         * Maneja input de fecha/hora con validación estricta
+         */
+        async function handleDateInput(text) {
+            // Si solo tenemos fecha, pedimos hora
+            if (!conversationState.date) {
+                const validation = validateDateTime(text);
+                
+                if (!validation.valid) {
+                    conversationState.dateAttempts++;
+                    
+                    if (conversationState.dateAttempts > CONFIG.MAX_DATE_ATTEMPTS) {
+                        await botResponse(validation.error, 400);
+                        await botResponse('Ha superado el número de intentos. Permíteme ayudarle de nuevo...', 600);
+                        await delay(1000);
+                        resetConversation();
+                        return;
+                    }
+                    
+                    const remaining = CONFIG.MAX_DATE_ATTEMPTS - conversationState.dateAttempts + 1;
+                    await botResponse(validation.error, 400);
+                    await botResponse(`Le queda ${remaining} intento. Por favor, verifique la fecha e intente de nuevo.`);
+                    return;
+                }
+                
+                // Fecha válida, guardar y pedir hora
+                conversationState.date = validation.data.date;
+                conversationState.dateAttempts = 0;
+                
+                await botResponse(`Fecha disponible: **${formatDateElegant(validation.data.date)}**`);
+                await botResponse('¿A qué hora desea su sesión? (Formato: HH:MM, entre 11:00 y 21:00)');
+                
+                DOM.input.placeholder = 'HH:MM (ej: 16:30)';
+                return;
+            }
+            
+            // Ya tenemos fecha, ahora validamos hora
+            const timeValidation = validateDateTime(conversationState.date, text);
+            
+            if (!timeValidation.valid) {
+                conversationState.dateAttempts++;
+                
+                if (conversationState.dateAttempts > CONFIG.MAX_DATE_ATTEMPTS) {
+                    await botResponse(timeValidation.error, 400);
+                    await botResponse('Ha superado el número de intentos. Comencemos de nuevo...', 600);
+                    await delay(1000);
+                    resetConversation();
+                    return;
+                }
+                
+                await botResponse(timeValidation.error);
+                return;
+            }
+            
+            // Fecha y hora válidas
+            conversationState.time = timeValidation.data.time;
+            conversationState.dateAttempts = 0;
+            transitionTo('reserva_datos');
+        }
+
+        /**
+         * Maneja captura de datos personales en flujo de reserva
+         */
+        async function handlePersonalDataInput(text) {
+            // Paso 1: Capturar nombre
+            if (!conversationState.name) {
+                if (text.length < 2) {
+                    await botResponse('Por favor, indique su nombre completo para poder dirigirnos correctamente a usted.');
+                    return;
+                }
+                
+                conversationState.name = text;
+                await botResponse(`Encantado, ${text.split(' ')[0]}.`);
+                await botResponse('¿Podría facilitarme un número de teléfono móvil? Solo lo utilizaremos para confirmar su cita o comunicar cualquier imprevisto.');
+                
+                DOM.input.placeholder = '612 345 678';
+                DOM.input.type = 'tel';
+                return;
+            }
+            
+            // Paso 2: Capturar teléfono
+            if (!conversationState.phone) {
+                // Validación básica teléfono español
+                const cleanPhone = text.replace(/\s/g, '').replace(/^\+34/, '');
+                const phoneRegex = /^[6789]\d{8}$/;
+                
+                if (!phoneRegex.test(cleanPhone)) {
+                    await botResponse('El número no parece válido. Por favor, indique un móvil español de 9 dígitos (ejemplo: 612 345 678).');
+                    return;
+                }
+                
+                conversationState.phone = cleanPhone;
+                DOM.input.type = 'text';
+                transitionTo('confirmado');
+            }
+        }
+
+        /**
+         * Maneja flujo de contacto por email
+         */
+        async function handleEmailContactInput(text) {
+            const step = conversationState.step || 'nombre';
+            
+            if (step === 'nombre') {
+                if (text.length < 2) {
+                    await botResponse('Por favor, indique su nombre.');
+                    return;
+                }
+                conversationState.name = text;
+                conversationState.step = 'email';
+                
+                await botResponse('Gracias. ¿Cuál es su dirección de email?');
+                DOM.input.placeholder = 'su@email.com';
+                DOM.input.type = 'email';
+                return;
+            }
+            
+            if (step === 'email') {
+                // Validación básica email
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(text)) {
+                    await botResponse('El formato del email no parece correcto. Por favor, verifíquelo.');
+                    return;
+                }
+                
+                conversationState.email = text;
+                conversationState.step = 'consulta';
+                
+                await botResponse('Perfecto. ¿Cuál es el motivo de su consulta? Puede describir brevemente qué información necesita.');
+                DOM.input.placeholder = 'Su consulta...';
+                return;
+            }
+            
+            if (step === 'consulta') {
+                if (text.length < 10) {
+                    await botResponse('Por favor, sea un poco más específico para que podamos ayudarle mejor (mínimo 10 caracteres).');
+                    return;
+                }
+                
+                conversationState.query = text;
+                transitionTo('confirmado');
+            }
+        }
+
+        // ==========================================
+        // CONTROL GLOBAL DE LA CONVERSACIÓN
+        // ==========================================
+
+        /**
+         * Reset completo de la conversación
+         */
+        function resetConversation() {
+            // Preservar solo el historial para analytics si fuera necesario
+            const history = conversationState.messageHistory;
+            
+            // Resetear estado
+            Object.assign(conversationState, {
+                current: 'menu',
+                sessionType: null,
+                duration: null,
+                date: null,
+                time: null,
+                name: null,
+                email: null,
+                phone: null,
+                query: null,
+                dateAttempts: 0,
+                forbiddenAttempts: 0,
+                pendingSwitch: null,
+                lastActivity: Date.now(),
+                messageHistory: history
+            });
+            
+            // Limpiar UI
+            const messages = DOM.messages.querySelectorAll('.message');
+            messages.forEach(m => m.remove());
+            
+            DOM.input.placeholder = 'Escriba su consulta...';
+            DOM.input.type = 'text';
+            
+            // Restaurar typing indicator
+            DOM.messages.appendChild(DOM.typing);
+            
+            transitionTo('menu');
+        }
+
+        /**
+         * Actualiza timestamp de actividad
+         */
+        function updateActivity() {
+            conversationState.lastActivity = Date.now();
+        }
+
+        /**
+         * Verifica inactividad y reinicia si es necesario
+         */
+        function checkInactivity() {
+            if (conversationState.current === 'bloqueado') return;
+            
+            const inactive = Date.now() - conversationState.lastActivity > CONFIG.INACTIVITY_TIMEOUT;
+            
+            if (inactive && conversationState.current !== 'menu') {
+                addMessage('La conversación se ha reiniciado por inactividad.', 'bot');
+                resetConversation();
+            }
+        }
+
+        // ==========================================
+        // INTERFAZ DE USUARIO
+        // ==========================================
+
+        /**
+         * Toggle visibilidad del chat
+         */
+        function toggleChat() {
+            const isActive = DOM.container.classList.contains('active');
+            
+            if (isActive) {
+                DOM.container.classList.remove('active');
+                DOM.trigger.classList.remove('hidden');
+                DOM.overlay.classList.remove('active');
+                document.body.style.overflow = '';
+            } else {
+                DOM.container.classList.add('active');
+                DOM.trigger.classList.add('hidden');
+                DOM.overlay.classList.add('active');
+                document.body.style.overflow = 'hidden'; // Prevenir scroll de fondo en móvil
+                
+                // Iniciar conversación si es primera vez
+                if (DOM.messages.querySelectorAll('.message').length === 0) {
+                    transitionTo('inicio');
+                }
+                
+                updateActivity();
+            }
+        }
+
+        /**
+         * Envía mensaje desde input
+         */
+        function sendMessage() {
+            const text = DOM.input.value.trim();
+            if (!text || DOM.input.disabled) return;
+            
+            addMessage(text, 'user');
+            DOM.input.value = '';
+            processUserInput(text);
+        }
+
+        // ==========================================
+        // EVENT LISTENERS
+        // ==========================================
+
+        // Toggle chat
+        DOM.trigger.addEventListener('click', toggleChat);
+        DOM.close.addEventListener('click', toggleChat);
+        DOM.overlay.addEventListener('click', toggleChat);
+
+        // Input handlers
+        DOM.send.addEventListener('click', sendMessage);
+        
+        DOM.input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // Prevenir zoom en input en iOS
+        DOM.input.addEventListener('focus', () => {
+            if (window.innerWidth < 480) {
+                document.body.style.zoom = '1';
+            }
+        });
+
+        // Inactividad: verificar cada minuto
+        setInterval(checkInactivity, 60000);
+
+        // Prevenir menú contextual en elementos sensibles (opcional seguridad)
+        DOM.container.addEventListener('contextmenu', (e) => {
+            if (e.target.closest('.message')) {
+                e.preventDefault();
+            }
+        });
+
+        // ==========================================
+        // INICIALIZACIÓN
+        // ==========================================
+        
+        // Marcar como inicializado
+        console.log('Santai Chatbot v1.0 - Sistema inicializado');
+        
+        // Notificación sutil tras 10 segundos (opcional)
+        setTimeout(() => {
+            if (!DOM.container.classList.contains('active')) {
+                DOM.trigger.classList.add('has-notification');
+            }
+        }, 10000);
+
+    </script>
+</body>
+</html>
