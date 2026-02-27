@@ -1,31 +1,1131 @@
 <!DOCTYPE html>
 <html lang="es">
-
-    
-        <style>
-        body {
-            background-color:#295252;
-            }
-            
-        .parr {
-           padding: 20%;
-            color: white;
-            }
-        
-            h1 {
-           padding: 10%;
-            color: #121212;
-            }
-        </style>
-    
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CHAT ORGANIZADOR DE CITAS</title>
+    <title>Chatbot Reservas - Masajes</title>
+    <style>
+        :root {
+            --primary-green: #0f6b5f;
+            --accent-pink: #e6006f;
+            --light-bg: #f2f2f2;
+            --dark-text: #222;
+            --white: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--light-bg);
+            min-height: 100vh;
+        }
+
+        /* Botón Flotante */
+        .chat-float-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: var(--primary-green);
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            z-index: 1000;
+        }
+
+        .chat-float-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+
+        .chat-float-btn svg {
+            width: 30px;
+            height: 30px;
+            fill: var(--white);
+        }
+
+        .chat-float-btn.hidden {
+            display: none;
+        }
+
+        /* Ventana del Chat */
+        .chat-window {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 90vw;
+            max-width: 380px;
+            height: 70vh;
+            max-height: 600px;
+            background: var(--white);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: scale(0) translateY(20px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 999;
+        }
+
+        .chat-window.open {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+
+        /* Header */
+        .chat-header {
+            background: var(--primary-green);
+            color: var(--white);
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-header-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chat-avatar {
+            width: 40px;
+            height: 40px;
+            background: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .chat-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .chat-status {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .chat-close {
+            background: none;
+            border: none;
+            color: var(--white);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        /* Área de Mensajes */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: var(--light-bg);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.5;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.bot {
+            background: var(--white);
+            color: var(--dark-text);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .message.user {
+            background: var(--primary-green);
+            color: var(--white);
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+        }
+
+        .message.warning {
+            background: #fff3e0;
+            color: #e65100;
+            border: 1px solid #ffcc80;
+        }
+
+        .message.blocked {
+            background: #424242;
+            color: var(--white);
+            text-align: center;
+        }
+
+        /* Botones de Acción */
+        .chat-actions {
+            padding: 15px;
+            background: var(--white);
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .action-btn {
+            background: var(--accent-pink);
+            color: var(--white);
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .action-btn:hover {
+            background: #c4005c;
+            transform: translateX(5px);
+        }
+
+        .action-btn.secondary {
+            background: transparent;
+            color: var(--primary-green);
+            border: 2px solid var(--primary-green);
+        }
+
+        .action-btn.secondary:hover {
+            background: var(--primary-green);
+            color: var(--white);
+        }
+
+        /* Input Area */
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+            padding: 10px 15px 15px;
+            background: var(--white);
+        }
+
+        .chat-input {
+            flex: 1;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            padding: 12px 20px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input:focus {
+            border-color: var(--primary-green);
+        }
+
+        .chat-input:disabled {
+            background: #f5f5f5;
+            cursor: not-allowed;
+        }
+
+        .chat-send {
+            background: var(--primary-green);
+            color: var(--white);
+            border: none;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .chat-send:hover {
+            background: #0a4d44;
+        }
+
+        .chat-send:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .chat-send svg {
+            width: 20px;
+            height: 20px;
+            fill: var(--white);
+        }
+
+        /* Indicador de escritura */
+        .typing-indicator {
+            display: none;
+            align-self: flex-start;
+            background: var(--white);
+            padding: 15px 20px;
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+        }
+
+        .typing-indicator.active {
+            display: flex;
+            gap: 5px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: #999;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+
+        /* Scrollbar personalizada */
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 3px;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .chat-window {
+                width: 100vw;
+                height: 100vh;
+                max-height: 100vh;
+                bottom: 0;
+                right: 0;
+                border-radius: 0;
+            }
+            
+            .chat-float-btn {
+                bottom: 15px;
+                right: 15px;
+            }
+        }
+
+        /* Overlay para móvil */
+        .chat-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 998;
+        }
+
+        .chat-overlay.active {
+            display: block;
+        }
+    </style>
 </head>
 <body>
-   <center> <h1>Chat inteligente autmatizador de CITAS</h1></center>
-    <div class="parr"><p>El objetivo es crear un chat para el publico adulto, en el que puedan agendar una visita con alguna(s) profesionales del sector sensorial. Hay que crear un flujo de discurso para guiar al cliente a lo que desa y ajustaros segun la legalidad. </p></div>
-</body>
+
+    <!-- Overlay para móvil -->
+    <div class="chat-overlay" id="chatOverlay"></div>
+
+    <!-- Botón Flotante -->
+    <button class="chat-float-btn" id="floatBtn" aria-label="Abrir chat">
+        <svg viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+        </svg>
+    </button>
+
+    <!-- Ventana del Chat -->
+    <div class="chat-window" id="chatWindow">
+        <!-- Header -->
+        <div class="chat-header">
+            <div class="chat-header-info">
+                <div class="chat-avatar">💆</div>
+                <div>
+                    <div class="chat-title">Reservas Spa</div>
+                    <div class="chat-status">● En línea</div>
+                </div>
+            </div>
+            <button class="chat-close" id="closeBtn" aria-label="Cerrar chat">×</button>
+        </div>
+
+        <!-- Mensajes -->
+        <div class="chat-messages" id="chatMessages">
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="chat-actions" id="chatActions"></div>
+
+        <!-- Input -->
+        <div class="chat-input-area">
+            <input 
+                type="text" 
+                class="chat-input" 
+                id="chatInput" 
+                placeholder="Escribe tu mensaje..." 
+                autocomplete="off"
+            >
+            <button class="chat-send" id="sendBtn" aria-label="Enviar">
+                <svg viewBox="0 0 24 24">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * CHATBOT - Sistema de Reservas de Masajes
+         * Flujo guiado basado en estados sin APIs externas
+         */
+
+        // ==========================================
+        // CONFIGURACIÓN Y ESTADO
+        // ==========================================
+        
+        const CONFIG = {
+            // Palabras clave globales para reinicio
+            RESET_KEYWORDS: ['menu', 'inicio', 'volver', 'principal', 'reserva'],
+            
+            // Palabras prohibidas
+            FORBIDDEN_WORDS: ['sexo', 'penetración', 'penetracion', 'oral', 'completo', 'todo incluido', 'todo incluido'],
+            
+            // Límites
+            MAX_DATE_ATTEMPTS: 2,
+            MAX_FORBIDDEN_ATTEMPTS: 2,
+            INACTIVITY_TIMEOUT: 5 * 60 * 1000, // 5 minutos en ms
+            
+            // Precios (simulado - en producción vendría de backend)
+            PRICES: {
+                individual: {
+                    '60': 80,
+                    '90': 120,
+                    '120': 160
+                },
+                pareja: {
+                    '60': 150,
+                    '90': 220,
+                    '120': 280
+                }
+            }
+        };
+
+        // Estado global de la conversación
+        let state = {
+            current: 'menu',           // Estado actual del flujo
+            sessionType: null,         // 'individual' o 'pareja'
+            duration: null,            // Duración seleccionada
+            date: null,                // Fecha seleccionada
+            name: null,                // Nombre del cliente
+            phone: null,               // Teléfono (nunca expuesto en frontend visible)
+            dateAttempts: 0,           // Intentos de fecha incorrecta
+            forbiddenAttempts: 0,      // Intentos de palabras prohibidas
+            pendingSwitch: null,       // Cambio de estado pendiente (coherencia)
+            lastActivity: Date.now()   // Última actividad para timeout
+        };
+
+        // Referencias DOM
+        const elements = {
+            floatBtn: document.getElementById('floatBtn'),
+            chatWindow: document.getElementById('chatWindow'),
+            closeBtn: document.getElementById('closeBtn'),
+            chatOverlay: document.getElementById('chatOverlay'),
+            messages: document.getElementById('chatMessages'),
+            actions: document.getElementById('chatActions'),
+            input: document.getElementById('chatInput'),
+            sendBtn: document.getElementById('sendBtn'),
+            typing: document.getElementById('typingIndicator')
+        };
+
+        // ==========================================
+        // UTILIDADES
+        // ==========================================
+
+        // Normalizar texto (minúsculas, sin acentos)
+        function normalizeText(text) {
+            return text.toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+        }
+
+        // Detectar palabras prohibidas
+        function containsForbiddenWords(text) {
+            const normalized = normalizeText(text);
+            return CONFIG.FORBIDDEN_WORDS.some(word => normalized.includes(word));
+        }
+
+        // Detectar palabras de reinicio
+        function containsResetKeyword(text) {
+            const normalized = normalizeText(text);
+            return CONFIG.RESET_KEYWORDS.some(keyword => normalized.includes(keyword));
+        }
+
+        // Validar fecha (formato DD/MM/YYYY)
+        function validateDate(dateStr) {
+            const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+            const match = dateStr.match(regex);
+            
+            if (!match) return { valid: false, error: 'Formato inválido. Usa DD/MM/YYYY' };
+            
+            const day = parseInt(match[1], 10);
+            const month = parseInt(match[2], 10);
+            const year = parseInt(match[3], 10);
+            
+            // Verificar rangos básicos
+            if (month < 1 || month > 12) return { valid: false, error: 'Mes inválido' };
+            if (day < 1 || day > 31) return { valid: false, error: 'Día inválido' };
+            
+            // Verificar días por mes
+            const daysInMonth = new Date(year, month, 0).getDate();
+            if (day > daysInMonth) return { valid: false, error: `El mes ${month} solo tiene ${daysInMonth} días` };
+            
+            // Verificar fecha futura
+            const inputDate = new Date(year, month - 1, day);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            if (inputDate < today) return { valid: false, error: 'La fecha debe ser futura' };
+            
+            return { valid: true, date: inputDate, formatted: `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}` };
+        }
+
+        // Formatear fecha para mostrar
+        function formatDate(dateStr) {
+            const [day, month, year] = dateStr.split('/');
+            const date = new Date(year, month - 1, day);
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            return date.toLocaleDateString('es-ES', options);
+        }
+
+        // ==========================================
+        // GESTIÓN DE UI
+        // ==========================================
+
+        // Añadir mensaje al chat
+        function addMessage(text, type = 'bot') {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${type}`;
+            msgDiv.textContent = text;
+            elements.messages.insertBefore(msgDiv, elements.typing);
+            elements.messages.scrollTop = elements.messages.scrollHeight;
+            return msgDiv;
+        }
+
+        // Mostrar indicador de escritura
+        function showTyping() {
+            elements.typing.classList.add('active');
+            elements.messages.scrollTop = elements.messages.scrollHeight;
+        }
+
+        // Ocultar indicador de escritura
+        function hideTyping() {
+            elements.typing.classList.remove('active');
+        }
+
+        // Simular delay de respuesta del bot
+        async function botResponse(text, delay = 600) {
+            showTyping();
+            await new Promise(r => setTimeout(r, delay));
+            hideTyping();
+            return addMessage(text, 'bot');
+        }
+
+        // Limpiar botones de acción
+        function clearActions() {
+            elements.actions.innerHTML = '';
+        }
+
+        // Añadir botón de acción
+        function addActionButton(text, onClick, secondary = false) {
+            const btn = document.createElement('button');
+            btn.className = `action-btn ${secondary ? 'secondary' : ''}`;
+            btn.textContent = text;
+            btn.onclick = onClick;
+            elements.actions.appendChild(btn);
+        }
+
+        // Bloquear/desbloquear input
+        function setInputEnabled(enabled) {
+            elements.input.disabled = !enabled;
+            elements.sendBtn.disabled = !enabled;
+            if (enabled) {
+                elements.input.focus();
+            }
+        }
+
+        // ==========================================
+        // GESTIÓN DE ESTADOS
+        // ==========================================
+
+        // Máquina de estados principal
+        const stateMachine = {
+            
+            // ESTADO: MENÚ PRINCIPAL
+            menu: async () => {
+                state.current = 'menu';
+                clearActions();
+                setInputEnabled(false);
+                
+                await botResponse('¡Hola! 👋 Bienvenido/a a nuestro centro de masajes sensoriales.\n\n¿En qué puedo ayudarte hoy?');
+                
+                addActionButton('💆 Sesión Individual', () => transitionTo('individual'));
+                addActionButton('💑 Sesión en Pareja', () => transitionTo('pareja'));
+                addActionButton('ℹ️ Información antes de reservar', () => transitionTo('info'));
+                addActionButton('💰 Precios y disponibilidad', () => transitionTo('precios'));
+            },
+
+            // ESTADO: SESIÓN INDIVIDUAL
+            individual: async () => {
+                state.current = 'individual';
+                state.sessionType = 'individual';
+                clearActions();
+                
+                await botResponse('Has seleccionado: Sesión Individual 💆\n\nNuestras terapeutas especializadas te ofrecerán una experiencia de relajación única en un ambiente privado y discreto.\n\n¿Qué duración prefieres?');
+                
+                addActionButton('60 minutos - 80€', () => selectDuration('60'));
+                addActionButton('90 minutos - 120€', () => selectDuration('90'));
+                addActionButton('120 minutos - 160€', () => selectDuration('120'));
+                addActionButton('← Volver al menú', () => transitionTo('menu'), true);
+            },
+
+            // ESTADO: SESIÓN EN PAREJA
+            pareja: async () => {
+                state.current = 'pareja';
+                state.sessionType = 'pareja';
+                clearActions();
+                
+                await botResponse('Has seleccionado: Sesión en Pareja 💑\n\nDisfruta de una experiencia compartida con tu pareja. Dos terapeutas simultáneas en una suite privada.\n\n¿Qué duración prefieres?');
+                
+                addActionButton('60 minutos - 150€', () => selectDuration('60'));
+                addActionButton('90 minutos - 220€', () => selectDuration('90'));
+                addActionButton('120 minutos - 280€', () => selectDuration('120'));
+                addActionButton('← Volver al menú', () => transitionTo('menu'), true);
+            },
+
+            // ESTADO: INFORMACIÓN
+            info: async () => {
+                state.current = 'info';
+                clearActions();
+                setInputEnabled(false);
+                
+                await botResponse('📋 Información Importante:\n\n• Todas nuestras sesiones son MANUALES y profesionales\n• Ambiente climatizado, música relajante y aromaterapia\n• Duchas privadas disponibles\n• Toallas, gel y todo lo necesario incluido\n• Máxima higiene y discreción\n• Estacionamiento privado\n\n⏰ Horario: Lunes a Sábado de 10:00 a 22:00\n📍 Ubicación: Centro de la ciudad (dirección exacta tras confirmar reserva)\n\n¿Te gustaría hacer una reserva?');
+                
+                addActionButton('Sí, reservar ahora', () => transitionTo('menu'));
+                addActionButton('Ver precios primero', () => transitionTo('precios'), true);
+            },
+
+            // ESTADO: PRECIOS
+            precios: async () => {
+                state.current = 'precios';
+                clearActions();
+                setInputEnabled(false);
+                
+                await botResponse('💰 Lista de Precios:\n\n👤 SESIONES INDIVIDUALES:\n• 60 minutos: 80€\n• 90 minutos: 120€\n• 120 minutos: 160€\n\n👥 SESIONES EN PAREJA:\n• 60 minutos: 150€\n• 90 minutos: 220€\n• 120 minutos: 280€\n\n✨ Incluye: Aromaterapia, música, ducha privada, bebida de bienvenida.\n\n💳 Formas de pago: Efectivo, tarjeta o Bizum.');
+                
+                addActionButton('Reservar Individual', () => transitionTo('individual'));
+                addActionButton('Reservar Pareja', () => transitionTo('pareja'));
+                addActionButton('← Volver al menú', () => transitionTo('menu'), true);
+            },
+
+            // ESTADO: SELECCIÓN DE FECHA
+            fecha: async () => {
+                state.current = 'fecha';
+                clearActions();
+                setInputEnabled(true);
+                
+                await botResponse(`Perfecto. Has elegido:\n${state.sessionType === 'individual' ? '💆 Sesión Individual' : '💑 Sesión en Pareja'}\n⏱️ Duración: ${state.duration} minutos\n\n📅 ¿Qué día te gustaría venir?\n\nPor favor, escribe la fecha en formato DD/MM/YYYY\n(Ejemplo: 25/12/2024)`);
+                
+                elements.input.placeholder = 'DD/MM/YYYY';
+            },
+
+            // ESTADO: DATOS PERSONALES
+            datos: async () => {
+                state.current = 'datos';
+                clearActions();
+                setInputEnabled(true);
+                
+                await botResponse(`¡Excelente! 📅 ${formatDate(state.date)}\n\nPara confirmar tu reserva necesito algunos datos:\n\n¿Cómo te llamas?`);
+                
+                elements.input.placeholder = 'Tu nombre completo';
+            },
+
+            // ESTADO: CONFIRMADO
+            confirmado: async () => {
+                state.current = 'confirmado';
+                clearActions();
+                setInputEnabled(false);
+                
+                // Enviar lead al backend
+                await sendLead();
+                
+                await botResponse(`✅ ¡Reserva Confirmada!\n\n📋 Resumen:\n• Tipo: ${state.sessionType === 'individual' ? 'Individual' : 'En Pareja'}\n• Duración: ${state.duration} minutos\n• Fecha: ${formatDate(state.date)}\n• Nombre: ${state.name}\n• Teléfono: ${state.phone}\n\n💳 Recuerda: El pago se realiza en el centro.\n\n📞 Te contactaremos al ${state.phone} para confirmar la hora exacta.\n\n¡Gracias por confiar en nosotros! 💆‍♀️`);
+                
+                addActionButton('Hacer otra reserva', () => resetConversation());
+                addActionButton('Finalizar', () => toggleChat(), true);
+            },
+
+            // ESTADO: BLOQUEADO
+            bloqueado: async () => {
+                state.current = 'bloqueado';
+                clearActions();
+                setInputEnabled(false);
+                
+                await botResponse('🔒 Conversación bloqueada por seguridad.\n\nSi deseas hacer una reserva legítima, por favor contacta directamente por teléfono o email.', 'blocked');
+                
+                // No hay botones, está bloqueado
+            }
+        };
+
+        // ==========================================
+        // LÓGICA DE TRANSICIONES
+        // ==========================================
+
+        // Transición entre estados con verificación de coherencia
+        async function transitionTo(newState) {
+            // Verificar inactividad
+            updateActivity();
+            
+            // Si estamos en medio de una reserva y queremos cambiar
+            if (state.sessionType && (newState === 'individual' || newState === 'pareja') && 
+                state.sessionType !== newState && state.current !== 'menu') {
+                
+                if (!state.pendingSwitch) {
+                    state.pendingSwitch = newState;
+                    await botResponse(`⚠️ Estás en medio de una reserva para sesión ${state.sessionType}. ¿Seguro que quieres cambiar a ${newState}?`);
+                    
+                    clearActions();
+                    addActionButton('Sí, cambiar', () => {
+                        state.sessionType = null;
+                        state.duration = null;
+                        state.date = null;
+                        state.pendingSwitch = null;
+                        transitionTo(newState);
+                    });
+                    addActionButton('No, continuar', () => {
+                        state.pendingSwitch = null;
+                        transitionTo(state.current);
+                    }, true);
+                    return;
+                }
+            }
+            
+            // Resetear intentos al cambiar de estado principal
+            if (['menu', 'individual', 'pareja'].includes(newState)) {
+                state.dateAttempts = 0;
+            }
+            
+            await stateMachine[newState]();
+        }
+
+        // Seleccionar duración
+        function selectDuration(duration) {
+            state.duration = duration;
+            transitionTo('fecha');
+        }
+
+        // ==========================================
+        // VALIDACIÓN DE ENTRADAS
+        // ==========================================
+
+        // Procesar entrada del usuario según estado actual
+        async function processInput(text) {
+            updateActivity();
+            
+            // Verificar palabras prohibidas primero
+            if (containsForbiddenWords(text)) {
+                state.forbiddenAttempts++;
+                
+                if (state.forbiddenAttempts >= CONFIG.MAX_FORBIDDEN_ATTEMPTS) {
+                    await botResponse('❌ Lo siento, pero tras múltiples intentos de solicitar servicios que no ofrecemos, debemos finalizar esta conversación. Solo realizamos masajes manuales profesionales.', 'error');
+                    await new Promise(r => setTimeout(r, 1000));
+                    transitionTo('bloqueado');
+                    return;
+                }
+                
+                await botResponse('⚠️ Entendemos tu consulta, pero debemos aclarar: SOLO realizamos masajes manuales profesionales y terapéuticos. No ofrecemos ningún tipo de servicio sexual o íntimo.\n\nSi buscas una experiencia de relajación legítima, estaremos encantados de atenderte.', 'warning');
+                return;
+            }
+            
+            // Verificar palabras de reinicio
+            if (containsResetKeyword(text)) {
+                await botResponse('🔄 Volviendo al menú principal...');
+                resetConversation();
+                return;
+            }
+            
+            // Máquina de estados para inputs
+            switch (state.current) {
+                case 'fecha':
+                    await handleDateInput(text);
+                    break;
+                case 'datos':
+                    await handleDataInput(text);
+                    break;
+                case 'menu':
+                case 'info':
+                case 'precios':
+                    await botResponse('Por favor, selecciona una opción de los botones o escribe "menu" para ver las opciones.');
+                    break;
+                default:
+                    await botResponse('No entiendo tu mensaje. Escribe "menu" para volver al inicio.');
+            }
+        }
+
+        // Manejar input de fecha
+        async function handleDateInput(text) {
+            const validation = validateDate(text);
+            
+            if (!validation.valid) {
+                state.dateAttempts++;
+                
+                if (state.dateAttempts > CONFIG.MAX_DATE_ATTEMPTS) {
+                    await botResponse(`❌ ${validation.error}\n\nHas agotado los intentos. Volvamos a empezar...`, 'error');
+                    await new Promise(r => setTimeout(r, 1500));
+                    resetConversation();
+                    return;
+                }
+                
+                const remaining = CONFIG.MAX_DATE_ATTEMPTS - state.dateAttempts + 1;
+                await botResponse(`❌ ${validation.error}\n\nTe quedan ${remaining} intento(s). Por favor, usa el formato DD/MM/YYYY (ejemplo: 15/03/2024)`, 'error');
+                return;
+            }
+            
+            // Fecha válida
+            state.date = validation.formatted;
+            transitionTo('datos');
+        }
+
+        // Manejar input de datos personales
+        async function handleDataInput(text) {
+            if (!state.name) {
+                // Validar nombre (mínimo 2 palabras o 3 caracteres)
+                if (text.trim().length < 3) {
+                    await botResponse('Por favor, introduce un nombre válido (mínimo 3 caracteres).');
+                    return;
+                }
+                
+                state.name = text.trim();
+                await botResponse(`Gracias, ${state.name.split(' ')[0]} 📱\n\n¿Cuál es tu número de teléfono? (Solo para confirmar la reserva)`);
+                elements.input.placeholder = '612 345 678';
+                elements.input.type = 'tel';
+                return;
+            }
+            
+            if (!state.phone) {
+                // Validar teléfono español
+                const phoneRegex = /^[6789]\d{8}$/;
+                const cleanPhone = text.replace(/\s/g, '').replace(/^\+34/, '');
+                
+                if (!phoneRegex.test(cleanPhone)) {
+                    await botResponse('Por favor, introduce un número de teléfono válido español (9 dígitos, sin prefijo).');
+                    return;
+                }
+                
+                state.phone = cleanPhone;
+                elements.input.type = 'text';
+                transitionTo('confirmado');
+            }
+        }
+
+        // ==========================================
+        // COMUNICACIÓN CON BACKEND
+        // ==========================================
+
+        // Enviar lead al servidor
+        async function sendLead() {
+            const leadData = {
+                sessionType: state.sessionType,
+                duration: state.duration,
+                date: state.date,
+                name: state.name,
+                phone: state.phone,
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent
+            };
+            
+            try {
+                const response = await fetch('/api/sendLead', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(leadData)
+                });
+                
+                if (!response.ok) {
+                    console.error('Error enviando lead:', await response.text());
+                }
+            } catch (error) {
+                console.error('Error de red:', error);
+                // No mostrar error al usuario, el lead se guarda en localStorage como backup
+                saveLocalBackup(leadData);
+            }
+        }
+
+        // Backup local por si falla el servidor
+        function saveLocalBackup(leadData) {
+            const leads = JSON.parse(localStorage.getItem('chatbot_leads') || '[]');
+            leads.push(leadData);
+            localStorage.setItem('chatbot_leads', JSON.stringify(leads));
+        }
+
+        // ==========================================
+        // CONTROL DE CONVERSACIÓN
+        // ==========================================
+
+        // Resetear conversación completa
+        function resetConversation() {
+            state = {
+                current: 'menu',
+                sessionType: null,
+                duration: null,
+                date: null,
+                name: null,
+                phone: null,
+                dateAttempts: 0,
+                forbiddenAttempts: 0,
+                pendingSwitch: null,
+                lastActivity: Date.now()
+            };
+            
+            // Limpiar mensajes excepto typing indicator
+            const messages = elements.messages.querySelectorAll('.message');
+            messages.forEach(m => m.remove());
+            
+            elements.input.placeholder = 'Escribe tu mensaje...';
+            elements.input.type = 'text';
+            
+            transitionTo('menu');
+        }
+
+        // Actualizar timestamp de actividad
+        function updateActivity() {
+            state.lastActivity = Date.now();
+        }
+
+        // Verificar inactividad
+        function checkInactivity() {
+            if (state.current === 'bloqueado') return;
+            
+            const inactive = Date.now() - state.lastActivity > CONFIG.INACTIVITY_TIMEOUT;
+            if (inactive && state.current !== 'menu') {
+                addMessage('⏰ Conversación reiniciada por inactividad.', 'bot');
+                resetConversation();
+            }
+        }
+
+        // ==========================================
+        // EVENT LISTENERS
+        // ==========================================
+
+        // Toggle ventana de chat
+        function toggleChat() {
+            const isOpen = elements.chatWindow.classList.contains('open');
+            
+            if (isOpen) {
+                elements.chatWindow.classList.remove('open');
+                elements.floatBtn.classList.remove('hidden');
+                elements.chatOverlay.classList.remove('active');
+            } else {
+                elements.chatWindow.classList.add('open');
+                elements.floatBtn.classList.add('hidden');
+                elements.chatOverlay.classList.add('active');
+                
+                // Iniciar conversación si es la primera vez
+                if (elements.messages.querySelectorAll('.message').length === 0) {
+                    transitionTo('menu');
+                }
+                
+                updateActivity();
+            }
+        }
+
+        // Event listeners
+        elements.floatBtn.addEventListener('click', toggleChat);
+        elements.closeBtn.addEventListener('click', toggleChat);
+        elements.chatOverlay.addEventListener('click', toggleChat);
+
+        // Enviar mensaje
+        function sendMessage() {
+            const text = elements.input.value.trim();
+            if (!text) return;
+            
+            addMessage(text, 'user');
+            elements.input.value = '';
+            processInput(text);
+        }
+
+        elements.sendBtn.addEventListener('click', sendMessage);
+        
+        elements.input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // Iniciar verificación de inactividad cada minuto
+        setInterval(checkInactivity, 60000);
+
+        // Prevenir clic derecho en el chat (seguridad básica)
+        elements.chatWindow.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+    </script>
+
+    <!-- 
+    ==========================================
+    BACKEND NODE.JS - Ejemplo de implementación
+    Guardar como server.js en el servidor
+    ==========================================
     
+    require('dotenv').config();
+    const express = require('express');
+    const axios = require('axios');
+    const app = express();
+    
+    // Middleware
+    app.use(express.json());
+    app.use(express.static('public')); // Servir archivos estáticos
+    
+    // Configuración desde variables de entorno
+    const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+    const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID;
+    const ADMIN_PHONE = process.env.ADMIN_PHONE; // Número del administrador (con código de país)
+    
+    // Endpoint para recibir leads
+    app.post('/api/sendLead', async (req, res) => {
+        try {
+            const { sessionType, duration, date, name, phone, timestamp } = req.body;
+            
+            // Validar datos mínimos
+            if (!sessionType || !duration || !date || !name || !phone) {
+                return res.status(400).json({ error: 'Datos incompletos' });
+            }
+            
+            // Construir mensaje para WhatsApp
+            const message = `
+    🔔 *Nueva Reserva - Spa* 🔔
+
+    📋 *Tipo:* ${sessionType === 'individual' ? 'Sesión Individual' : 'Sesión en Pareja'}
+    ⏱️ *Duración:* ${duration} minutos
+    📅 *Fecha solicitada:* ${date}
+    👤 *Cliente:* ${name}
+    📱 *Teléfono:* ${phone}
+    🕐 *Recibido:* ${new Date(timestamp).toLocaleString('es-ES')}
+
+    💬 Acción requerida: Confirmar disponibilidad y hora.
+            `.trim();
+            
+            // Enviar mensaje vía WhatsApp Business API
+            const response = await axios.post(
+                `https://graph.facebook.com/v18.0/${WHATSAPP_PHONE_ID}/messages`,
+                {
+                    messaging_product: 'whatsapp',
+                    recipient_type: 'individual',
+                    to: ADMIN_PHONE,
+                    type: 'text',
+                    text: { body: message }
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            
+            console.log('Mensaje enviado:', response.data);
+            res.json({ success: true, messageId: response.data.messages?.[0]?.id });
+            
+        } catch (error) {
+            console.error('Error enviando WhatsApp:', error.response?.data || error.message);
+            res.status(500).json({ 
+                error: 'Error enviando notificación',
+                details: error.response?.data?.error?.message || error.message 
+            });
+        }
+    });
+    
+    // Health check
+    app.get('/api/health', (req, res) => {
+        res.json({ status: 'OK', timestamp: new Date().toISOString() });
+    });
+    
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`Servidor corriendo en puerto ${PORT}`);
+    });
+    
+    ==========================================
+    package.json necesario:
+    {
+      "name": "chatbot-masajes-backend",
+      "version": "1.0.0",
+      "dependencies": {
+        "express": "^4.18.2",
+        "axios": "^1.6.0",
+        "dotenv": "^16.3.1"
+      },
+      "scripts": {
+        "start": "node server.js"
+      }
+    }
+    
+    ==========================================
+    .env.example (nunca subir .env real a git):
+    
+    WHATSAPP_TOKEN=tu_token_de_whatsapp_business_api
+    WHATSAPP_PHONE_ID=id_del_numero_de_telefono_en_meta
+    ADMIN_PHONE=34612345678
+    PORT=3000
+    
+    ==========================================
+    -->
+</body>
 </html>
